@@ -1,0 +1,39 @@
+VERSION 1.2
+Added some new features:
+- added code for reading data from an HDF5 Gadget file
+
+- added a new option called '--input' or '-i' that can be used to specify the input file type, the data to read from the input file and for what species. The '--input' option has the form: '--input  input_file_type   data_to_read    particle_species_to_read'   where the last two make sense only for Gadget files. The DEFAULT values are: '--input 101 7 2'
+- the new option '--input' or '-i' needs to be followed by an integer specifying the input file type. By default it understands the following options: 
+      101 - gadget binary snapshot saved as single or multiple files type I or II [ DEFAULT choice unsless specified otherwise in the Makefile ]
+      105 - gadget HDF5 file/files
+      111 - reads particles positions and masses (weights) from a text file. First line gives particle number followed by 6 coordinates giving the box dimensions: "xMin xMax yMin yMax zMin zMax". After this each row 'i' in the file gives positions X, Y, Z and weight for particle 'i'.
+      112 - reads particles positions from a text file. First line gives particle number followed by 6 coordinates giving the box dimensions: "xMin xMax yMin yMax zMin zMax". After this each row 'i' in the file gives positions X, Y and Z for particle 'i'. (note that each particle is assumed to have the same mass/weight)
+      121 - read particle positions, mass and velocities from a binary file. Modify this function in file 'src/io/binary_io.cc'
+      131 - read particle positions, mass and velocities from your custom file. Modify this function in file 'src/io/my_io.cc'
+you can set the default output file in the Makefile by changing the values assigned to the '-DINPUT_FILE_DEFAULT' option.
+- added a second integer value to the '--input' option to specify what which data to read. At the moment works only for gadget files and you can select to read the following:
+      1 - read particle positions
+      2 - read particle weights
+      4 - read particle velocities
+to read multiple data add the number corresponding to each data set, for example 3=1+2 - specifies to read only particle positions and weights/masses, while a value of 7=1+2+4 specifies to read positions, weights and velocities [ DEFAULT = 7 -read positions, weights and velocities ]
+- added an additional third option after for the '--input' parameter which specifies for which gadget particle species to read the data. You can select the following:
+      1 - read the data for gadget species 1 (normally gas particles)
+      2 - read the data for gadget species 2 (normally dark matter particles) [DEFAULT]
+      4 - read the data for gadget species 3 (usually stars or different mass DM particles in multiple resolution simulations)
+      8 - read the data for gadget species 4
+      16 - read the data for gadget species 5
+      32 - read the data for gadget species 6
+to read data for multiple species just add the number corresponding to each particle type, for example 7=1+2+4 - specifies to read the data for both particle types 1, 2 and 3.
+
+- added the '--output' or '-o' option to specify the output file type. Available options:
+      101 - the default binary output
+      100 - binary file with my own custom header and file structure
+you can set the default output file in the Makefile by changing the values assigned to the '-DOUTPUT_FILE_DEFAULT' option.
+
+- added option '--resdhiftSpace' that can be used to tranform the particle positions from position-space to redshift-space. For the option to work you need to enable the '-DREDSHIFT_SPACE' option in the Makefile. Than you need to call the '--resdhiftSpace d1 d2 d3' during runtime with (d1,d2,d3) the direction along which to use the velocity for the transformation to redshift space. The (d1,d2,d3) direction will be normalized to a unit vector by the program!
+
+
+
+
+VERSION 1.1.2
+- fixed bug when using the '--partition nx ny nz' with nx*ny*nz>=27
