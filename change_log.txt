@@ -1,3 +1,8 @@
+VERSION 1.2.1
+- fixed option '--CIC' which before did not work and actually defaulted to DTFE interpolation. In the previous version there was a function that was wrongly named CIC_interpolation that actually did NGP interpolation.
+- added NGP interpolation method
+
+
 VERSION 1.2
 Added some new features:
 - added code for reading data from an HDF5 Gadget file
