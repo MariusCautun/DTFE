@@ -41,6 +41,7 @@ using namespace std;
 #include "user_options.cc"
 #include "quantities.cc"
 
+#include "NGP_interpolation.cc"
 #include "CIC_interpolation.cc"
 #include "TSC_interpolation.cc"
 #include "SPH_interpolation.cc"
@@ -270,6 +271,8 @@ void interpolate(vector<Particle_data> *allParticles,
 {
     if ( userOptions.DTFE )
         DTFE_interpolation( allParticles, samples, userOptions, uQuantities, aQuantities );
+    else if ( userOptions.NGP )
+        NGP_interpolation( allParticles, samples, userOptions, aQuantities );
     else if ( userOptions.CIC )
         CIC_interpolation( allParticles, samples, userOptions, aQuantities );
     else if ( userOptions.TSC )

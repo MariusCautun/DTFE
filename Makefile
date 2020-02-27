@@ -2,9 +2,9 @@
 
 
 # Path to the GSL, Boost C++ and CGAL libraries - must be set by user (only if they aren't installed in the default system path) -- (NOTE: You must add only the directory where the libraries are installed, the program will add the '/lib' and '/include' parts automatically); C++ compiler - preferably a version that supports OpenMP
-GSL_PATH = /net/plato/data/users/cautun/Programs/stow/
-BOOST_PATH = 
-CGAL_PATH = 
+GSL_PATH = /cosma/local/gsl/2.4
+BOOST_PATH = /cosma/local/boost/gnu_7.3.0/1_67_0
+CGAL_PATH = /cosma/home/dphlss/cautun/Programs/stow
 CC = g++
 # set the following if you have installed the HDF5 library and would like to read in HDF5 gadget files
 HDF5_PATH = 
@@ -105,9 +105,7 @@ endif
 COMPILE_FLAGS = -frounding-math -O3 -fopenmp -DNDEBUG $(OPTIONS)
 DTFE_INC = $(INCLUDES)
 # the following libraries should work in most cases
-DTFE_LIB = -rdynamic $(LIBRARIES) -lCGAL -lboost_thread -lboost_filesystem -lboost_program_options -lgsl -lgslcblas -lm -lboost_system
-# the following libraries work on "Fedora 15"
-# DTFE_LIB = -rdynamic $(LIBRARIES) -lCGAL -lboost_thread-mt -lboost_filesystem -lboost_program_options -lgsl -lgslcblas -lgmp -lboost_system
+DTFE_LIB = -rdynamic $(LIBRARIES) -lCGAL -lboost_thread -lboost_filesystem -lboost_program_options -lgmp -lgsl -lgslcblas -lm -lboost_system
 
 
 

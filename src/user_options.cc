@@ -74,6 +74,7 @@ User_options::User_options()
     
     // additional options
     DTFE = true;
+    NGP = false;
     CIC = false;
     TSC = false;
     SPH = false;
@@ -187,6 +188,7 @@ void User_options::addOptions(po::options_description &allOptions,
     po::options_description additionalOptions("Additional options");
     additionalOptions.add_options()
             ("config,c", po::value<std::string>(&(this->configFilename)), "supply all/part of the program options in a configuration file. The option syntax is the same as at the command line. Can insert comments using the '#' symbol (everything after this symbol until the end of the line will be considered a comment)." )
+            ("NGP", "choose the NGP (nearest grid point) as the grid interpolation method instead of DTFE. This method is available only for: density and velocity fields.")
             ("CIC", "choose the CIC (Cloud In Cell) as the grid interpolation method instead of DTFE. This method is available only for: density and velocity fields.")
             ("TSC", "choose the TSC (Triangular Shape Cloud) as the grid interpolation method instead of DTFE. This method is available only for: density and velocity fields.")
             ("SPH", po::value<int>(&(this->SPH_neighbors)), "choose the SPH (Smoothed Particle Hydrodynamics) as the grid interpolation method instead of DTFE. This method is available only for: density, velocity and scalar fields.")
@@ -323,6 +325,7 @@ void User_options::shortHelp( char *progName )
     po::options_description additionalOptions("Additional options");
     additionalOptions.add_options()
             ("config,c", po::value< Real >(&temp), "name the configuration file from which to read the program options." )
+            ("NGP", "choose NGP (Nearest Grid Point) for grid interpolation.")
             ("CIC", "choose CIC (Cloud In Cell) for grid interpolation.")
             ("TSC", "choose TSC (Triangular Shape Cloud) for grid interpolation.")
             ("SPH", po::value< Real >(&temp), "choose SPH for grid interpolation (argument = number nearest neighbors).")
@@ -387,7 +390,8 @@ void User_options::printOptions()
     if ( this->uField.scalar ) uField += " scalar,";
     if ( this->uField.scalar_gradient ) uField += " scalar gradient,";
     if ( this->uField.triangulation ) uField += " triangulation,";
-    if ( not this->uField.selected() and this->CIC ) uField = "none since CIC interpolation";
+    if ( not this->uField.selected() and this->NGP ) uField = "none since NGP interpolation";
+    else if ( not this->uField.selected() and this->CIC ) uField = "none since CIC interpolation";
     else if ( not this->uField.selected() and this->TSC ) uField = "none since TSC interpolation";
     else if ( not this->uField.selected() and this->SPH ) uField = "none since SPH interpolation";
     else if ( not this->uField.selected() ) uField = "none";
@@ -406,6 +410,7 @@ void User_options::printOptions()
     
     std::string interpolationMethod = "DTFE";
     if ( this->CIC ) interpolationMethod = "CIC";
+    else if ( this->NGP ) interpolationMethod = "NGP";
     else if ( this->TSC ) interpolationMethod = "TSC";
     else if ( this->SPH ) 
     {
@@ -589,6 +594,9 @@ void User_options::readOptions(int argc, char *argv[], bool getFileNames, bool s
     conflicting_options(vm, "SPH", "TSC");
     conflicting_options(vm, "SPH", "CIC");
     conflicting_options(vm, "CIC", "TSC");
+    conflicting_options(vm, "NGP", "CIC");
+    conflicting_options(vm, "NGP", "TSC");
+    conflicting_options(vm, "NGP", "SPH");
     conflicting_options(vm, "region", "regionMpc");
     conflicting_options(vm, "padding", "paddingMpc");
     
@@ -772,6 +780,16 @@ void User_options::readOptions(int argc, char *argv[], bool getFileNames, bool s
     
     
     // read the additional options
+    if ( vm.count("NGP") )
+    {
+        this->NGP = true;
+        this->DTFE = false;
+    }
+    if ( vm.count("CIC") )
+    {
+        this->CIC = true;
+        this->DTFE = false;
+    }
     if ( vm.count("TSC") )
     {
         this->TSC = true;
@@ -834,7 +852,7 @@ void User_options::readOptions(int argc, char *argv[], bool getFileNames, bool s
 #endif
     
     // some special settings only for the TSC or SPH methods
-    if ( this->CIC or this->TSC or this->SPH )
+    if ( this->NGP or this->CIC or this->TSC or this->SPH )
     {
         // for CIC, TSC and SPH only one type of fields are available - the averaged ones
         if ( this->uField.density ) this->aField.density = true;
@@ -851,17 +869,17 @@ void User_options::readOptions(int argc, char *argv[], bool getFileNames, bool s
         if ( this->aField.velocity_gradient or this->aField.selectedVelocityDerivatives() )
         {
             MESSAGE::Warning warning( verboseLevel );
-            warning << "The CIC, TSC or SPH grid interpolation methods do not have implemented a method for computing the velocity gradient. The velocity gradient will not be computed!" << MESSAGE::EndWarning;
+            warning << "The NGP, CIC, TSC or SPH grid interpolation methods do not have implemented a method for computing the velocity gradient. The velocity gradient will not be computed!" << MESSAGE::EndWarning;
             this->aField.velocity_gradient = false;
             this->aField.deselectVelocityDerivatives(); // switches off the divergence, shear and vorticity computations
         }
         if ( this->aField.scalar_gradient )
         {
             MESSAGE::Warning warning( verboseLevel );
-            warning << "The CIC, TSC or SPH grid interpolation methods do not have implemented a method for computing the velocity gradient. The velocity gradient will not be computed!" << MESSAGE::EndWarning;
+            warning << "The NGP, CIC, TSC or SPH grid interpolation methods do not have implemented a method for computing the velocity gradient. The velocity gradient will not be computed!" << MESSAGE::EndWarning;
             this->aField.scalar_gradient = false;
         }
-        if ( (this->CIC or this->TSC) and this->aField.scalar )
+        if ( (this->NGP or this->CIC or this->TSC) and this->aField.scalar )
         {
             MESSAGE::Warning warning( verboseLevel );
             warning << "The CIC and TSC grid interpolation method does not have implemented a method for computing the scalar fields on the grid. The scalar field cannot be computed!" << MESSAGE::EndWarning;
@@ -1007,14 +1025,14 @@ void User_options::updateEntries(size_t const noTotalParticles,
     
     
     // switch gradient computations off for the TSC and SPH methods
-    if ( CIC or TSC or SPH )
+    if ( NGP or CIC or TSC or SPH )
     {
         if ( aField.velocity_gradient or aField.selectedVelocityDerivatives() )
-            throwError( "The CIC, TSC and SPH grid interpolation methods do not have implemented a method for computing the velocity gradient. The velocity gradient cannot be computed!");
+            throwError( "The NGP, CIC, TSC and SPH grid interpolation methods do not have implemented a method for computing the velocity gradient. The velocity gradient cannot be computed!");
         if ( aField.scalar_gradient )
-            throwError( "The CIC, TSC and SPH grid interpolation methods do not have implemented a method for computing the scalar fields gradients. The scalar gradient cannot be computed!");
+            throwError( "The NGP, CIC, TSC and SPH grid interpolation methods do not have implemented a method for computing the scalar fields gradients. The scalar gradient cannot be computed!");
         if ( (CIC or TSC) and aField.scalar )
-            throwError( "The CIC and TSC grid interpolation method does not have implemented a method for computing the scalar fields on the grid. The scalar field cannot be computed!");
+            throwError( "The NGP, CIC and TSC grid interpolation method does not have implemented a method for computing the scalar fields on the grid. The scalar field cannot be computed!");
     }
     
     
@@ -1047,7 +1065,7 @@ void User_options::updatePadding(size_t const noTotalParticles)
             if ( this->DTFE or this->SPH )    //padding for the DTFE and SPH methods
                 for (int i=0; i<2*NO_DIM; ++i)
                     paddingLength[i] = paddingParticles / Real( pow(noTotalParticles,1./NO_DIM) ) * fullBoxLength[i%2];
-            else if ( this->TSC )
+            else if ( this->TSC or this->NGP )
                 for (int i=0; i<2*NO_DIM; ++i)
                     paddingLength[i] = fullBoxLength[i%2] / gridSize[i%2];
             else if ( this->CIC )

@@ -152,6 +152,7 @@ struct User_options
     
     // additional options
     std::string configFilename;// the program options can be supplied in a file too. This keeps track of the file name where the options where supplied.
+    bool   NGP;           // true if to use CIC grid interpolation instead of DTFE
     bool   CIC;           // true if to use CIC grid interpolation instead of DTFE
     bool   TSC;           // true if to use TSC grid interpolation instead of DTFE
     bool   SPH;           // true if to use SPH grid interpolation instead of DTFE

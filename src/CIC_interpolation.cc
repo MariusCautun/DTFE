@@ -44,7 +44,7 @@ void CIC_interpolation_regular_grid(vector<Particle_data> &particles,
 
 
 
-/* This function interpolates the density and velocity to grid using the CIC (cloud in cell) method. */
+/* This function interpolates the density and velocity to grid using the CIC (triangular shape cloud) method. */
 void CIC_interpolation(vector<Particle_data> *particles,
                        vector<Sample_point> &samples,
                        User_options &userOptions,
@@ -79,47 +79,184 @@ void CIC_interpolation_regular_grid(vector<Particle_data> &particles,
     // allocate memory for the results
     size_t const reserveSize = (NO_DIM==2) ? nGrid[0]*nGrid[1] : nGrid[0]*nGrid[1]*nGrid[2];
     q->density.assign( reserveSize, Real(0.) );
-    if ( userOptions.aField.velocity )
-		q->velocity.assign( reserveSize, Pvector<Real,noVelComp>::zero() );
+    q->velocity.assign( reserveSize, Pvector<Real,noVelComp>::zero() );
     
     
-    // get the grid spacing
-    Box box = userOptions.region;
-    Real dx[NO_DIM];
+    // get the grid spacing and find the extended box of particles that give contribution in the region of interest
+    Box box = userOptions.region,
+        outerBox = userOptions.region,
+        innerBox = userOptions.region;
+    Real dx[NO_DIM], outerPadding[2*NO_DIM], innerPadding[2*NO_DIM];
     for (int i=0; i<NO_DIM; ++i)
+    {
         dx[i] = (box[2*i+1]-box[2*i]) / nGrid[i];
+        outerPadding[2*i] = dx[i];
+        outerPadding[2*i+1] = dx[i];
+    }
+    for (int i=0; i<2*NO_DIM; ++i)
+        innerPadding[i] = -1.1*outerPadding[i];    // slightly larger than 1 grid cell to account for numerical uncertanties
+    outerBox.addPadding( outerPadding );  // only particles in this box give contributions in 'userOptions.region'
+    innerBox.addPadding( innerPadding );  // the contribution of particles in this box is limited to the region of interest
     
     
     // find the particles in box 'box'
+    list< vectorIterator > innerParticles, outerParticles;
     for (vectorIterator it=particles.begin(); it!=particles.end(); ++it)
-	{
-		int cell[NO_DIM];
-		bool validCell = true;
-		for (int j=0; j<NO_DIM; ++j)
-		{
-			cell[j] = int( floor( (it->position(j)-box[2*j])/dx[j] ) );
-			if ( cell[j]<0 or cell[j]>=nGrid[j] )
-				validCell = false;
-		}
-		if ( not validCell ) continue;
+        if ( innerBox.isParticleInBox(*it) )
+            innerParticles.push_back( it );     // keep track of the particles that give contributions only inside the region of interest
+        else if ( outerBox.isParticleInBox(*it) )
+            outerParticles.push_back( it );     // these particles give contributions also outside the region of interest
+    
+    
+    
+    // loop over all the particles in the inner box
+    for (list< vectorIterator >::iterator it=innerParticles.begin(); it!=innerParticles.end(); ++it)
+    {
+        int cell[NO_DIM][3];    // the grid coordinates of the cell that get a contribution from the particle
+        Real weight[NO_DIM][3]; // the weight associated to the particle for each cell that it contributes to
+        for (int j=0; j<NO_DIM; ++j)
+        {
+            Real temp = ( (*it)->position(j) - box[2*j] ) / dx[j];
+            cell[j][0] = int(floor( temp )) - 1;
+            cell[j][1] = cell[j][0] + 1;
+            cell[j][2] = cell[j][1] + 1;
+            
+            temp -= cell[j][1] + 0.5; //this gives the distance of the particle with respect to the center of the density grid in which the particle is located
+            
+            // compute the weight associated to this direction
+            if ( temp < 0.)
+            {
+				weight[j][0] = -temp;
+				weight[j][1] = 1 + temp;
+				weight[j][2] = 0.;
+			}
+			else
+            {
+				weight[j][0] = 0.;
+				weight[j][1] = 1 - temp;
+				weight[j][2] = temp;
+			}
+            
+        }
+        
+        // get the density contribution of the particle to the neighboring cells
 #if NO_DIM==2
-		int index = cell[0] * nGrid[1] + cell[1];
+        for (int i1=0; i1<3; ++i1)
+            for (int i2=0; i2<3; ++i2)
+            {
+                int index = cell[0][i1] * nGrid[1] + cell[1][i2];
+                Real result = (*it)->weight() * weight[0][i1] * weight[1][i2];
+                q->density[index] += result;
+                q->velocity[index] += (*it)->velocity() * result;
+            }
 #elif NO_DIM==3
-		int index = cell[0] * nGrid[1]*nGrid[2] + cell[1] * nGrid[2] + cell[2];
+        for (int i1=0; i1<3; ++i1)
+            for (int i2=0; i2<3; ++i2)
+                for (int i3=0; i3<3; ++i3)
+                {
+                    int index = cell[0][i1] * nGrid[1]*nGrid[2] + cell[1][i2] * nGrid[2] + cell[2][i3];
+                    Real result = (*it)->weight() * weight[0][i1] * weight[1][i2] * weight[2][i3];
+                    q->density[index] += result;
+                    q->velocity[index] += ( (*it)->velocity() * result );
+                }
 #endif
-		q->density[index] += it->weight();
-		if ( userOptions.aField.velocity )
-			q->velocity[index] += it->velocity() * it->weight();
-	}
+    }
+    
+    
+    // now loop over the particles on the boundary - must check that all neighbors are valid cells
+    for (list< vectorIterator >::iterator it=outerParticles.begin(); it!=outerParticles.end(); ++it)
+    {
+        int cell[NO_DIM][3];    // the grid coordinates of the cell that get a contribution from the particle
+        int cellCount[NO_DIM];  // counts how many valid cells are along each dimension that get contribution from the particle
+        for (int i=0; i<NO_DIM; ++i) cellCount[i] = 0;
+        Real weight[NO_DIM][3]; // the weight associated to the particle for each cell that it contributes to
+        for (int j=0; j<NO_DIM; ++j)
+        {
+            Real temp = ( (*it)->position(j) - box[2*j] ) / dx[j];
+            int tempInt = int(floor( temp ));
+            temp -= tempInt + 0.5; //this gives the distance of the particle with respect to the center of the density grid in which the particle is located
+            if ( temp<-0.5 or temp>0.5 ) cout << temp << "\t" << j << "\t" << tempInt << "\n";
+            
+            // check that all neighbors must be valid cells
+            if ( tempInt==-1 )
+            {
+                cell[j][0] = 0; cellCount[j] = 1;
+                weight[j][0] = temp;
+            }
+            else if ( tempInt==0 )
+            {
+                cell[j][0] = 0; cell[j][1] = 1; cellCount[j] = 2;
+                weight[j][0] = 1 - temp;
+                weight[j][1] = temp;
+            }
+            else if ( tempInt==int(nGrid[j])-1 )
+            {
+                cell[j][0] = nGrid[j]-2; cell[j][1] = nGrid[j]-1; cellCount[j] = 2;
+                weight[j][0] = - temp;
+                weight[j][1] = 1 + temp;
+            }
+            else if ( tempInt==int(nGrid[j]) )
+            {
+                cell[j][0] = nGrid[j]-1; cellCount[j] = 1;
+                weight[j][0] = - temp;
+            }
+            else if ( not( tempInt<-1 or tempInt>int(nGrid[j]) ) )
+            {
+                cell[j][0] = tempInt-1;
+                cell[j][1] = tempInt;
+                cell[j][2] = tempInt+1;
+                cellCount[j] = 3;
+                
+                if ( temp < 0.)
+				{
+					weight[j][0] = -temp;
+					weight[j][1] = 1 + temp;
+					weight[j][2] = 0.;
+				}
+				else
+				{
+					weight[j][0] = 0.;
+					weight[j][1] = 1 - temp;
+					weight[j][2] = temp;
+				}
+            }
+        }
+        
+        // get the density contribution of the particle to the neighboring cells
+#if NO_DIM==2
+        for (int i1=0; i1<cellCount[0]; ++i1)
+            for (int i2=0; i2<cellCount[1]; ++i2)
+            {
+                int index = cell[0][i1] * nGrid[1] + cell[1][i2];
+                Real result = (*it)->weight() * weight[0][i1] * weight[1][i2];
+                q->density[index] += result;
+                q->velocity[index] += (*it)->velocity() * result;
+            }
+#elif NO_DIM==3
+        for (int i1=0; i1<cellCount[0]; ++i1)
+            for (int i2=0; i2<cellCount[1]; ++i2)
+                for (int i3=0; i3<cellCount[2]; ++i3)
+                {
+                    int index = cell[0][i1] * nGrid[1]*nGrid[2] + cell[1][i2] * nGrid[2] + cell[2][i3];
+                    Real result = (*it)->weight() * weight[0][i1] * weight[1][i2] * weight[2][i3];
+                    q->density[index] += result;
+                    q->velocity[index] += (*it)->velocity() * result;
+                }
+#endif
+    }
     
     
     // divide the momentum by the mass in the cells
     if ( userOptions.aField.velocity )
+    {
         for (size_t i=0; i<reserveSize; ++i)
             if ( q->density[i]!=Real(0.) )
                 q->velocity[i] /= q->density[i];
             else
                 q->velocity[i] = Pvector<Real,noVelComp>::zero();
+    }
+    else
+        q->velocity.clear();
     
     // normalize the density to average background density
     if ( userOptions.aField.density )
@@ -135,43 +272,6 @@ void CIC_interpolation_regular_grid(vector<Particle_data> &particles,
     printElapsedTime( &t, &userOptions, "CIC interpolation" );
 }
 
-
-/* This function counts how many particles are in each cell of a grid using the CIC method. */
-void CIC_particle_count(vector<Particle_data> &particles,
-                        size_t const *nGrid,
-                        Box box,
-                        vector<int> *counts)
-{
-    // allocate memory for the results
-    size_t const reserveSize = (NO_DIM==2) ? nGrid[0]*nGrid[1] : nGrid[0]*nGrid[1]*nGrid[2];
-    counts->assign( reserveSize, int(0) );
-	
-    // get the grid spacing
-    Real dx[NO_DIM];
-    for (int i=0; i<NO_DIM; ++i)
-        dx[i] = (box[2*i+1]-box[2*i]) / nGrid[i];
-    
-    
-    // find the particles in box 'box'
-    for (vectorIterator it=particles.begin(); it!=particles.end(); ++it)
-	{
-		int cell[NO_DIM];
-		bool validCell = true;
-		for (int j=0; j<NO_DIM; ++j)
-		{
-			cell[j] = int( floor( (it->position(j)-box[2*j])/dx[j] ) );
-			if ( cell[j]<0 or cell[j]>=nGrid[j] )
-				validCell = false;
-		}
-		if ( not validCell ) continue;
-#if NO_DIM==2
-		int index = cell[0] * nGrid[1] + cell[1];
-#elif NO_DIM==3
-		int index = cell[0] * nGrid[1]*nGrid[2] + cell[1] * nGrid[2] + cell[2];
-#endif
-		(*counts)[index] += 1;
-	}
-}
 
 
 

@@ -154,7 +154,7 @@ void insertParticlesInBox(std::vector<Particle_data> &p,
 }
 
 
-void CIC_particle_count(std::vector<Particle_data> &particles,
+void NGP_particle_count(std::vector<Particle_data> &particles,
                         size_t const *nGrid,
 						Box box,
                         std::vector<int> *counts);
@@ -245,7 +245,7 @@ void optimalPartitionSplit(std::vector<Particle_data> &particles,
 	
 	// find how many particles are in each cell of the grid
 	std::vector<int> counts;
-	CIC_particle_count( particles, grid, userOptions.region, &counts);
+	NGP_particle_count( particles, grid, userOptions.region, &counts);
 	
 	// split along the x-direction
 	std::vector<size_t> xSplitIndices; xSplitIndices.assign( partition[0]+1, size_t(0) );
