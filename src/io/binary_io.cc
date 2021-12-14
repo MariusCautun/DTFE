@@ -36,7 +36,7 @@ This function works when the binary file has the following format:
 NOTE: In this example the data is saved in the binary file in single precision format (float 32 bytes).
 */
 void readBinaryFile(std::string filename,
-                    Read_data<float> *readData,
+                    Read_data<Real> *readData,
                     User_options *userOptions)
 {
     MESSAGE::Message message( userOptions->verboseLevel );
@@ -77,6 +77,106 @@ void readBinaryFile(std::string filename,
     
     message << "Done.\n";
 }
+
+
+
+
+/* This function reds the input data from a binary file.
+This function works when the binary file has the following format:
+    1) file begins with an int value that gives the number of particles
+    2) for each particle there are N binary values which give: X, Y, Z, d1, ..., dN-3
+    3) Each particle has the above N values, which are stored starting with particle 1 to noParticles
+
+NOTE: In this example the data is saved in the binary file in single precision format (float 32 bytes).
+*/
+void readBinaryFile_StructuredData(std::string filename,
+                                   Read_data<Real> *readData,
+                                   User_options *userOptions)
+{
+    MESSAGE::Message message( userOptions->verboseLevel );
+    if ( userOptions->boxCoordinates.isNullBox() )
+        throwError( "The coordinates of the data box have not been specified. The function 'readBinaryFile_StructuredData' needs the box coordinates to be given as an option to the program since they are not stored in the input file!" );
+    
+    
+    // read some user options to determine the behaviour of the function
+    /*          massColumn -> the column storing the mass (weight) associated to each point - if =-1, than all points have the same weight
+     *          noElements -> the number of values for each point, minimum 3 giving the positions x, y, z
+     *          thresholdColumn -> gives the column used to decide which data points are kept and which not (<noElements) - if negative than no threshold is used
+     *          threshold  -> gives the threshold; values above this threshold are used in the program, the rest are discarded
+     * */
+    //if inserted an extra option it gives the value of the mass column
+    int massColumn = -1;    // default value: don't read any mass
+    if ( userOptions->additionalOptions.size()!=0 )
+        massColumn = atoi( userOptions->additionalOptions[0].c_str() );
+    bool readMasses = massColumn>=0 ? true : false;
+    
+    //if inserted at least two extra options, the second is the number of values (noElements) for each data point
+    int noElements = 6;     // default value
+    if ( userOptions->additionalOptions.size()>=2 )
+        noElements = atoi( userOptions->additionalOptions[1].c_str() );
+    
+    //if inserted an at least four extra options, the third is the column used to compare with the threshold and the fourth is the value of the threshold
+    int thresholdColumn = -1;   // default value - do not use a threshold
+    Real threshold = 0.;
+    if ( userOptions->additionalOptions.size()>=4 )
+    {
+        thresholdColumn = atoi( userOptions->additionalOptions[2].c_str() );    // column used to compare with the threshold
+        threshold = atof( userOptions->additionalOptions[3].c_str() );          // value of the threshold
+        message << "Selecting only the points that have the values in column " << thresholdColumn << " larger or equal than the threshold value " << threshold << " ... " << MESSAGE::Flush;
+    }
+    
+    
+    // open the file
+    message << "Reading the input data from the binary file '" << filename << "' ... " << MESSAGE::Flush;
+    std::fstream inputFile;
+    openInputBinaryFile( inputFile, filename );
+    
+    
+    // read the number of particles and the box coordinates from the binary file
+    int noParticles;
+    inputFile.read( reinterpret_cast<char *>(&noParticles), sizeof(noParticles) );
+    
+    
+    // read the full data structure
+    size_t dataSize = noParticles * noElements;
+    float *data = new float[dataSize];
+    inputFile.read( reinterpret_cast<char *>(data), dataSize * sizeof(float) );
+    inputFile.close();
+    message << "Done.\n";
+    
+    
+    // if a threshold is specified, find how many points pass this threshold
+    size_t noFinalPoints = 0;
+    if ( thresholdColumn>=0 )
+    {
+        for (int i=0; i<noParticles; ++i)
+            if ( data[i*noElements+thresholdColumn]>=threshold )
+                ++noFinalPoints;
+        message << "After applying the threshold, the program found " << noFinalPoints << " (" << std::setprecision(4) << noFinalPoints*100./noParticles << "%) valid points that will be used for any further computations.\n" << MESSAGE::Flush;
+    }
+    else
+        noFinalPoints = noParticles;
+    
+    
+    // copy the relevant information to the '*readData' structure
+    Real *positions = readData->position( noFinalPoints );  //particle positions
+    Real *weights;
+    if ( readMasses )
+        weights     = readData->weight( noFinalPoints );    //particle weights (e.g. weights = particle masses)
+    size_t counter = 0;
+    for (int i=0; i<noParticles; ++i)
+    {
+        if ( thresholdColumn>=0 and data[i*noElements+thresholdColumn]<threshold )  //skip points below the threshold
+            continue;
+        
+        for (int j=0; j<NO_DIM; ++j)
+            positions[counter*NO_DIM+j] = data[i*noElements+j];
+        if ( readMasses )
+            weights[counter] = data[i*noElements+massColumn];
+        ++counter;
+    }
+}
+
 
 
 

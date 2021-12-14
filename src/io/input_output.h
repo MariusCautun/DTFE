@@ -28,10 +28,6 @@ It also defines 4 functions to open binary/text files for input/output. */
 
 #include <algorithm>
 
-bool redshiftSpaceOn = false;
-Pvector<Real,NO_DIM> redshiftSpaceVector;
-
-
 
 // structure for pairs of pointer and bool used in structure 'Read_data'
 template <typename T>
@@ -65,7 +61,7 @@ struct PairPtrBool
             error << "When allocating memory for the variable 'Read_data::" << name << "'. The size of the variable (which is " << size << ") is different from the expected size of " << *expectedSize << " (all variables: position, velocity, weight and scalar must have the same size)." << MESSAGE::EndError;
         }
         *expectedSize = size;
-        _ptr = new float[dimensions*size];
+        _ptr = new T[dimensions*size];
         _assigned = true;
         return _ptr;
     }
@@ -163,14 +159,6 @@ struct Read_data
                 if ( _scalar._assigned )   // copy scalar fields if assigned
                     for (size_t j=0; j<noScalarComp; ++j)
                         temp.scalar(j) = _scalar._ptr[noScalarComp*i+j];
-                
-                // check if to transform to redshift space
-#ifdef REDSHIFT_SPACE
-                if ( redshiftSpaceOn )
-                    for (size_t j=0; j<NO_DIM; ++j)
-                        temp.position(j) += (redshiftSpaceVector[j] * temp.velocity(j) )  / Real(100.);
-#endif 
-                
                 p->push_back( temp );
             }
         }
@@ -267,20 +255,20 @@ void checkFileOperations(std::fstream & file,
 // Function used to swap bytes between different endianness
 inline void ByteSwap(unsigned char * b, int n)
 {
-    register int i = 0;
-    register int j = n-1;
-    while (i<j)
-    {
-        std::swap(b[i], b[j]);
-        i++, j--;
-    }
+	register int i = 0;
+	register int j = n-1;
+	while (i<j)
+	{
+		std::swap(b[i], b[j]);
+		i++, j--;
+	}
 }
 template <typename T>
 void ByteSwapArray(T *x, size_t const elements)
 {
-    int size = sizeof(x[0]);
-    for (size_t i=0; i<elements; ++i)
-        ByteSwap( (unsigned char *) &(x[i]), size );
+	int size = sizeof(x[0]);
+	for (size_t i=0; i<elements; ++i)
+		ByteSwap( (unsigned char *) &(x[i]), size );
 }
 
 #define BYTESWAP(x) ByteSwap( (unsigned char *) &x, sizeof(x) )

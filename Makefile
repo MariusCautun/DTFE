@@ -2,12 +2,13 @@
 
 
 # Path to the GSL, Boost C++ and CGAL libraries - must be set by user (only if they aren't installed in the default system path) -- (NOTE: You must add only the directory where the libraries are installed, the program will add the '/lib' and '/include' parts automatically); C++ compiler - preferably a version that supports OpenMP
-GSL_PATH = /cosma/local/gsl/2.4
+GSL_PATH   = /cosma/local/gsl/2.4
 BOOST_PATH = /cosma/local/boost/gnu_7.3.0/1_67_0
-CGAL_PATH = /cosma/home/dphlss/cautun/Programs/stow
+CGAL_PATH  = /cosma/home/dphlss/cautun/Programs/stow
+MPRF_PATH  = /cosma/home/dphlss/cautun/Programs/stow
 CC = g++
-# set the following if you have installed the HDF5 library and would like to read in HDF5 gadget files
-HDF5_PATH = 
+# set the following if you have installed the HDF5 library and would like to read in HDF5 gadget files (you need to compile the HDF5 library with the '--enable-cxx' configure option)
+HDF5_PATH  = /cosma/local/hdf5/gnu_7.3.0/1.10.3
 
 
 # paths to where to put the object files and the executables files. If you build the DTFE library than you also need to specify the directory where to put the library and the directory where to copy the header files needed by the library (choose an empty directory for the header files).
@@ -105,11 +106,11 @@ endif
 COMPILE_FLAGS = -frounding-math -O3 -fopenmp -DNDEBUG $(OPTIONS)
 DTFE_INC = $(INCLUDES)
 # the following libraries should work in most cases
-DTFE_LIB = -rdynamic $(LIBRARIES) -lCGAL -lboost_thread -lboost_filesystem -lboost_program_options -lgmp -lgsl -lgslcblas -lm -lboost_system
+DTFE_LIB = $(LIBRARIES) -lCGAL -lboost_thread -lboost_filesystem -lboost_program_options -lgsl -lgslcblas -lm  -lgmp -lmpfr -lboost_system
 
 
 
-IO_SOURCES = $(addprefix io/, input_output.h gadget_reader.cc text_io.cc binary_io.cc my_io.cc)
+IO_SOURCES = $(addprefix io/, input_output.h gadget_reader_header.cc gadget_reader_binary.cc gadget_reader_HDF5.cc gadget_reader_HDF5_Cristian.cc gadget_reader_MOG.cc hdf5_input_my_DESI.cc text_io.cc binary_io.cc my_io.cc)
 MAIN_SOURCES = main.cpp DTFE.h message.h user_options.h input_output.cc $(IO_SOURCES)
 DTFE_SOURCES = DTFE.cpp define.h particle_data.h user_options.h box.h quantities.h user_options.cc quantities.cc subpartition.h random.cc CIC_interpolation.cc TSC_interpolation.cc SPH_interpolation.cc kdtree/kdtree2.hpp Pvector.h message.h miscellaneous.h
 TRIANG_SOURCES = $(addprefix CGAL_triangulation/, triangulation.cpp triangulation_miscellaneous.cc unaveraged_interpolation.cc averaged_interpolation_1.cc averaged_interpolation_2.cc padding_test.cc CGAL_include_2D.h CGAL_include_3D.h vertexData.h particle_data_traits.h) define.h particle_data.h user_options.h box.h quantities.h Pvector.h message.h math_functions.h

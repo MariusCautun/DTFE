@@ -174,9 +174,14 @@ struct Density_header
         this->totalGrid = this->gridSize[0]*this->gridSize[1]*this->gridSize[2];
         
         // copy the program options used to get the data
+        int commandLength = userOptions.programOptions.length();
         for (int i=0; i<userOptions.programOptions.length(); ++i)
             this->fill[i] = userOptions.programOptions[i];
-        for (int i=userOptions.programOptions.length(); i<fillSize; ++i)
+        this->fill[ commandLength+0 ] = ' ';
+        this->fill[ commandLength+1 ] = ';';
+        this->fill[ commandLength+2 ] = ' ';
+        this->fill[ commandLength+3 ] = ' ';
+        for (int i=commandLength+4; i<fillSize; ++i)
             this->fill[i] = '\0';   // initialize the other elements to empty
         
         // get details about the methods
@@ -188,12 +193,12 @@ struct Density_header
         
         // get details about the output fields in the file
         if ( variableName.find( "density" )!=std::string::npos ) this->fileType = DENSITY_FILE;
-        else if ( variableName.find( "velocity" )!=std::string::npos ) this->fileType = VELOCITY_FILE;
         else if ( variableName.find( "velocity gradient" )!=std::string::npos ) this->fileType = VELOCITY_GRADIENT_FILE;
         else if ( variableName.find( "velocity divergence" )!=std::string::npos ) this->fileType = VELOCITY_DIVERGENCE_FILE;
         else if ( variableName.find( "velocity shear" )!=std::string::npos ) this->fileType = VELOCITY_SHEAR_FILE;
         else if ( variableName.find( "velocity vorticity" )!=std::string::npos ) this->fileType = VELOCITY_VORTICITY_FILE;
         else if ( variableName.find( "velocity standard deviation" )!=std::string::npos ) this->fileType = VELOCITY_STD_FILE;
+        else if ( variableName.find( "velocity" )!=std::string::npos ) this->fileType = VELOCITY_FILE;
         else if ( variableName.find( "scalar" )!=std::string::npos ) this->fileType = SCALAR_FIELD_FILE;
         else if ( variableName.find( "scalar gradient" )!=std::string::npos ) this->fileType = SCALAR_FIELD_GRADIENT_FILE;
     }
@@ -223,10 +228,8 @@ struct Density_header
             inputFile.read( reinterpret_cast<char *>(&gadgetHeader), sizeof(gadgetHeader) );
             inputFile.close();
         }
-#ifdef HDF5
         else if ( userOptions.inputFileType==105 )
             HDF5_readGadgetHeader( filename, &gadgetHeader );
-#endif
         else
             return;
         

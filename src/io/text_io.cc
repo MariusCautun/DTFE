@@ -59,7 +59,7 @@ One has similar functions for allocating memory for the rest of the particle pro
 NOTE: When calling the above functions the number of particle has to be the same for position, velocity, weight and scalar.
 */
 void readTextFile(std::string filename,
-                  Read_data<float> *readData,
+                  Read_data<Real> *readData,
                   User_options *userOptions)
 {
     MESSAGE::Message message( userOptions->verboseLevel );
@@ -109,7 +109,7 @@ void readTextFile(std::string filename,
 
 /* This function reads only the particle positions from a text file that contains only the positions. */
 void readTextFile_positions(std::string filename,
-                            Read_data<float> *readData,
+                            Read_data<Real> *readData,
                             User_options *userOptions)
 {
     MESSAGE::Message message( userOptions->verboseLevel );
@@ -146,7 +146,7 @@ void readTextFile_positions(std::string filename,
 
 /* Example of how to read the particle positions from a text file and also how to read in user defined sampling points for the grid where to interpolate the output fields. */
 void readTextFile_userDefinedSampling(std::string filename,
-                                      Read_data<float> *readData,
+                                      Read_data<Real> *readData,
                                       User_options *userOptions)
 {
     // 1st part of the functions: read the particle positions from the input file
@@ -194,8 +194,8 @@ void readTextFile_userDefinedSampling(std::string filename,
     inputFile >> noSamplingPoints;
     
     // reserve memory for reading in the user defined sampling points
-    float *samples = readData->sampling(noSamplingPoints);  // reserve memory for the coordinates of the sampling points
-    float *delta = readData->delta(noSamplingPoints);       // reserve memory for the cell size associated to each sampling point
+    Real *samples = readData->sampling(noSamplingPoints);  // reserve memory for the coordinates of the sampling points
+    Real *delta = readData->delta(noSamplingPoints);       // reserve memory for the cell size associated to each sampling point
     
     // read the data from the file
     for (int i=0; i<noSamplingPoints; ++i)

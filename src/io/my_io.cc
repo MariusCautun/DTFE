@@ -28,7 +28,7 @@
 
 /* Your custom functions for reading the input data. */
 void readMyFile(std::string filename,
-                Read_data<float> *readData,
+                Read_data<Real> *readData,
                 User_options *userOptions)
 {
     MESSAGE::Message message( userOptions->verboseLevel );

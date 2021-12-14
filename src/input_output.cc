@@ -25,7 +25,6 @@ Here are the functions used for data input and output.
 To easily find how to read the input data go to the function:
     
 
-
 */
 
 #ifndef INPUT_OUTPUT_HEADER
@@ -52,7 +51,12 @@ namespace bfs=boost::filesystem;
 #include "io/input_output.h"
 
 // different data format readers and writters
-#include "io/gadget_reader.cc"  // reader for Gadget snapshots
+#include "io/gadget_reader_header.cc" 
+#include "io/gadget_reader_binary.cc"  // reader for binary Gadget files
+#include "io/gadget_reader_HDF5.cc" // reader for Gadget snapshots in HDF5 format
+#include "io/gadget_reader_HDF5_Cristian.cc" // reader for Gadget HDF5 files using Cristian's format
+#include "io/gadget_reader_MOG.cc"  // reader for Gadget snapshots and MOG forces into scalar field
+#include "io/hdf5_input_my_DESI.cc" // reader for some personal DESI particle data
 #include "io/binary_io.cc"      // writer for binary file format
 #include "io/text_io.cc"        // reader/writer for text files
 #include "io/my_io.cc"          // reader/writer for text files
@@ -75,32 +79,37 @@ void openOutputTextFile(std::fstream & outputFile,
 
 //! Functions for reading the input data
 
-/* Read only positions from a text file and on top of that also reads user defined sampling points from an additional file (USE ONLY WHEN YOU NEED CUSTOM SAMPLING POINTS) - see the "src/io/text_io.cc" for the definition of this function */
-//#define DATA_INPUT_FUNCTION readTextFile_userDefinedSampling
+typedef void (*FunctionReadInputData)(std::string, Read_data<Real> *, User_options *);
 
-/* Read the input data from a binary file - see the "src/io/binary_io.cc" for the definition of this function */
-//#define DATA_INPUT_FUNCTION readBinaryFile
-
-
-typedef void (*FunctionReadInputData)(std::string, Read_data<float> *, User_options *);
-
-/*! This function uses the 'inputFileType' entry in the userOptions strcuture to decide on the function that will be used to read the input data. */
+/*! This function uses the 'inputFileType' entry in the userOptions class to decide on the function that will be used to read the input data. */
 FunctionReadInputData chooseInputDataReadFunction(int const inputFileType)
 {
     if ( inputFileType==101 )
         return &readGadgetFile;    // Read the input data from a single/multiple Gadget snapshot file (works only for snapshots type 1 or 2). See the "src/io/gadget_reader.cc" for the definition of this function.
+    if ( inputFileType==109 )
+        return &readGadgetFile_MOG;    // Read the input data from a single/multiple Gadget snapshot file (works only for snapshots type 1 or 2). Also reads modified gravity theory forces: the gravitational and fifth force. See the "src/io/gadget_reader_MOG.cc" for the definition of this function.
+#ifndef DOUBLE
 #ifdef HDF5
     else if ( inputFileType==105 )
-        return &HDF5_readGadgetFile;        // Read the input data from a HDF5 Gadget snapshot file. See the "src/io/gadget_reader.cc" for the definition of this function.
+        return &HDF5_readGadgetFile;        // Read the input data from a HDF5 Gadget snapshot file. See the "src/io/gadget_reader_HDF5.cc" for the definition of this function.
+    else if ( inputFileType==106 )
+        return &HDF5_readGadgetFile_HI;     // Read the input HI data from a HDF5 Gadget snapshot file. See the "src/io/gadget_reader_HDF5.cc" for the definition of this function.
+    else if ( inputFileType==107 )
+        return &HDF5_readData_DESI;         // Read the input data from a HDF5 file storing DESI particle data.
+    else if ( inputFileType==108 )
+        return &HDF5_readGadgetFile_Cristian;     // Read the input HI data from a HDF5 Gadget snapshot file. See the "src/io/gadget_reader_HDF5_Cristian.cc" for the definition of this function.
 #endif
     else if ( inputFileType==111 )
         return &readTextFile;               // Read the input data from a text file. See the "src/io/text_io.cc" for the definition of this function.
     else if ( inputFileType==112 )
         return &readTextFile_positions;     // Read the input data from a text file. The text file has only particle positions. See the "src/io/text_io.cc" for the definition of this function.
     else if ( inputFileType==121 )
-        return &readBinaryFile;             // Define your custom function to read the input data. Do this in the "src/io/binary_io.cc" file.
+        return &readBinaryFile;             // Define your custom function to read the input data. Do this in the "src/io/bynary_io.cc" file.
+    else if ( inputFileType==122 )
+        return &readBinaryFile_StructuredData;  // Function to read the input data. Defined in the "src/io/binary_io.cc" file.
     else if ( inputFileType==131 )
         return &readMyFile;                 // Define your custom function to read the input data. Do this in the "src/io/my_io.cc" file.
+#endif
     else
         throwError( "Unknow value for the 'inputFileType' argument in function 'chooseInputDataReadFunction'. The program could not recognize the input data file type." );
 }
@@ -108,7 +117,8 @@ FunctionReadInputData chooseInputDataReadFunction(int const inputFileType)
 
 
 
-/*! This function reads the particle data used for the DTFE computation. You can modify this function as you please. */
+
+/*! This function reads the particle data used for the DTFE computation. */
 void readInputData(std::vector<Particle_data> *p,
                    std::vector<Sample_point> *samplingCoordinates,
                    User_options *userOptions)
@@ -129,15 +139,15 @@ void readInputData(std::vector<Particle_data> *p,
             userOptions->boxCoordinates[i] /= userOptions->MpcValue;
         
         size_t noParticles = readData.noParticles();  // returns the number of particles
-        float *positions = readData.position();  //returns pointer to array storing particle positions
+        Real *positions = readData.position();  //returns pointer to array storing particle positions
         for (size_t i=0; i<noParticles*NO_DIM; ++i)
             positions[i] /= userOptions->MpcValue;
         
         // if the user inserted user defined sampling points, divide the coordinates of those points by the normalization factor
         if ( readData.noSamples()!=size_t(0) )
         {
-            float *sampling = readData.sampling();  // returns pointer to user defined sampling coordinates
-            float *delta = readData.delta();        // returns pointer to user defined sampling cell sizes
+            Real *sampling = readData.sampling();  // returns pointer to user defined sampling coordinates
+            Real *delta = readData.delta();        // returns pointer to user defined sampling cell sizes
             for (size_t i=0; i<readData.noSamples()*NO_DIM; ++i)
             {
                 sampling[i] /= userOptions->MpcValue;
@@ -148,19 +158,8 @@ void readInputData(std::vector<Particle_data> *p,
     
     
     // now store the data in the 'Particle_data list'. It also copies the user given sampling coordinates, if any - none in this case.
-    redshiftSpaceOn = userOptions->transformToRedshiftSpaceOn;
-    redshiftSpaceVector = Pvector<Real,NO_DIM>( &(userOptions->transformToRedshiftSpace[0]) );
-
-//    size_t noParticles = readData.noParticles();
-//    readData.scalar( noParticles );
-//    for (size_t i=0; i<noParticles; ++i)
-//        readData.scalar()[i] = 1.;
-    
     readData.transferData( p, samplingCoordinates );
-    
-//    for (int i=0; i<10; ++i) std::cout << "\nscalar " << (*p).at(i).scalar(0);  
 }
-
 
 
 
