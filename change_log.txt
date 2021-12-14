@@ -1,3 +1,19 @@
+VERSION 1.2.2
+- changed the file struccture used to read in the particcle data, that is the files in /src/io; Made each different file reader in its own file.
+- Added a new HDF5 reader for particle data for the 'FORGE' simulations obtained using Christian Arnolds' version of the AREPO code. In particular, the DM particle positions are stored as integer indices on a 2^32 grid covering the periodic box.
+- The list of input functions for reading various data types has been updated to:
+      101 - gadget binary snapshot saved as single or multiple files type I or II [ DEFAULT choice unsless specified otherwise in the Makefile ]
+      109 - same file type as 101 but reads additional data: also reads modified gravity theory forces: the gravitational and fifth force. Defined in: "src/io/gadget_reader_MOG.cc"
+      105 - gadget HDF5 file/files for the (now old) GIMIC simulations. Defined in: "src/io/gadget_reader_HDF5.cc"
+      107 - HDF5 file reader for my DESI particle data files. Defined in: "src/io/hdf5_input_my_DESI.cc" 
+      108 - gadget HDF5 file/files for the FORGE simulations. Defined in: "src/io/gadget_reader_HDF5_Cristian.cc"
+      111 - reads particles positions and masses (weights) from a text file. First line gives particle number followed by 6 coordinates giving the box dimensions: "xMin xMax yMin yMax zMin zMax". After this each row 'i' in the file gives positions X, Y, Z and weight for particle 'i'. Defined in: "src/io/text_io.cc"
+      112 - reads particles positions from a text file. First line gives particle number followed by 6 coordinates giving the box dimensions: "xMin xMax yMin yMax zMin zMax". After this each row 'i' in the file gives positions X, Y and Z for particle 'i'. (note that each particle is assumed to have the same mass/weight).  Defined in: "src/io/text_io.cc"
+      121 - read particle positions, mass and velocities from a binary file. Modify this function in file 'src/io/binary_io.cc'
+      131 - read particle positions, mass and velocities from your custom file. Modify this function in file 'src/io/my_io.cc'
+
+
+
 VERSION 1.2.1
 - fixed option '--CIC' which before did not work and actually defaulted to DTFE interpolation. In the previous version there was a function that was wrongly named CIC_interpolation that actually did NGP interpolation.
 - added NGP interpolation method
