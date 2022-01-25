@@ -1,0 +1,13 @@
+5
+0   10  0   10  0   10
+1   1   4   0.1
+3   4   2   0.3
+2   5   1   0.2
+7   8   2   1.4
+5   5   2   2.1
+***** Comments - do not include this part in an actual input file *****
+1) The first line should give the number of particles - this should always be present in the input file such that the program knows how many lines to read.
+2) The second line should give the coordinates of the box encompassing the data: xMin, xMax, yMin, yMax, zMin, zMax
+3) One each line, starting with 3rd line, one must give the particle positions plus additional particle properties. In this example we have the particle positions: x, y and z and in the 4th column the weight associated to each particle (for example mass in N-body simulation).
+NOTE: For each particle one needs at least 3 data values for 3-dimensions (2 for the 2-dimensions case) plus how many additional properties you need for each particle (e.g. weight, velocity, pressure, etc...). The number of column in the text file must match the function that reads the input data in the "src/io/text_io.cc" file - i.e. the function must read for each particle: the positions + additional particle properties.
+***** End comments ******
