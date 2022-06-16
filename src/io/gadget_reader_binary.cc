@@ -100,8 +100,10 @@ void initializeGadget(std::string filename,
     SWAP_HEADER_ENDIANNESS( *swapEndian, buffer1, buffer2, (*gadgetHeader) ); //swap endianness if that is the case  
     
     // get the type (float/double) used to store position and velocity data
+    inputFile.seekg( offset, std::ios::cur );
     inputFile.read( reinterpret_cast<char *>(&buffer3), sizeof(buffer3) );
     inputFile.seekg( buffer3, std::ios::cur );
+    inputFile.seekg( offset, std::ios::cur );
     inputFile.read( reinterpret_cast<char *>(&buffer4), sizeof(buffer4) );
     inputFile.read( reinterpret_cast<char *>(&buffer4), sizeof(buffer4) );
     inputFile.close();
